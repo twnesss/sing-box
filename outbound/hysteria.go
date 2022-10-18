@@ -16,6 +16,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/transport/hysteria"
+	"github.com/sagernet/sing-box/transport/tcpraw"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -27,6 +28,7 @@ var _ adapter.Outbound = (*Hysteria)(nil)
 
 type Hysteria struct {
 	myOutboundAdapter
+	tcpRaw       bool
 	ctx          context.Context
 	dialer       N.Dialer
 	serverAddr   M.Socksaddr
@@ -38,7 +40,7 @@ type Hysteria struct {
 	recvBPS      uint64
 	connAccess   sync.Mutex
 	conn         quic.Connection
-	rawConn      net.Conn
+	rawConn      net.PacketConn
 	udpAccess    sync.RWMutex
 	udpSessions  map[uint32]chan *hysteria.UDPMessage
 	udpDefragger hysteria.Defragger
@@ -114,7 +116,7 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 	if down < hysteria.MinSpeedBPS {
 		return nil, E.New("invalid down speed")
 	}
-	return &Hysteria{
+	outbound := &Hysteria{
 		myOutboundAdapter: myOutboundAdapter{
 			protocol: C.TypeHysteria,
 			network:  options.Network.Build(),
@@ -131,7 +133,15 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 		xplusKey:   xplus,
 		sendBPS:    up,
 		recvBPS:    down,
-	}, nil
+	}
+	switch options.Mode {
+	case "", "udp":
+	case "faketcp":
+		outbound.tcpRaw = true
+	default:
+		return nil, E.New("unsupported mode: ", options.Mode)
+	}
+	return outbound, nil
 }
 
 func (h *Hysteria) offer(ctx context.Context) (quic.Connection, error) {
@@ -163,17 +173,28 @@ func (h *Hysteria) offer(ctx context.Context) (quic.Connection, error) {
 }
 
 func (h *Hysteria) offerNew(ctx context.Context) (quic.Connection, error) {
-	udpConn, err := h.dialer.DialContext(h.ctx, "udp", h.serverAddr)
+	var packetConn net.PacketConn
+	var remoteAddr net.Addr
+	var err error
+	if h.tcpRaw {
+		packetConn, err = tcpraw.Dial("tcp", h.serverAddr.String())
+		remoteAddr = h.serverAddr.UDPAddr()
+	} else {
+		var conn net.Conn
+		conn, err = h.dialer.DialContext(h.ctx, "udp", h.serverAddr)
+		if err == nil {
+			packetConn = bufio.NewUnbindPacketConn(conn)
+			remoteAddr = conn.RemoteAddr()
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
-	var packetConn net.PacketConn
-	packetConn = bufio.NewUnbindPacketConn(udpConn)
 	if h.xplusKey != nil {
 		packetConn = hysteria.NewXPlusPacketConn(packetConn, h.xplusKey)
 	}
 	packetConn = &hysteria.PacketConnWrapper{PacketConn: packetConn}
-	quicConn, err := quic.Dial(packetConn, udpConn.RemoteAddr(), h.serverAddr.AddrString(), h.tlsConfig, h.quicConfig)
+	quicConn, err := quic.Dial(packetConn, remoteAddr, h.serverAddr.AddrString(), h.tlsConfig, h.quicConfig)
 	if err != nil {
 		packetConn.Close()
 		return nil, err
@@ -203,7 +224,7 @@ func (h *Hysteria) offerNew(ctx context.Context) (quic.Connection, error) {
 	}
 	quicConn.SetCongestionControl(hysteria.NewBrutalSender(congestion.ByteCount(serverHello.RecvBPS)))
 	h.conn = quicConn
-	h.rawConn = udpConn
+	h.rawConn = packetConn
 	return quicConn, nil
 }
 

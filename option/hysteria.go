@@ -2,6 +2,7 @@ package option
 
 type HysteriaInboundOptions struct {
 	ListenOptions
+	Mode                string             `json:"mode,omitempty"`
 	Up                  string             `json:"up,omitempty"`
 	UpMbps              int                `json:"up_mbps,omitempty"`
 	Down                string             `json:"down,omitempty"`
@@ -19,6 +20,7 @@ type HysteriaInboundOptions struct {
 type HysteriaOutboundOptions struct {
 	DialerOptions
 	ServerOptions
+	Mode                string              `json:"mode,omitempty"`
 	Up                  string              `json:"up,omitempty"`
 	UpMbps              int                 `json:"up_mbps,omitempty"`
 	Down                string              `json:"down,omitempty"`

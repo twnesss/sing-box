@@ -5,6 +5,8 @@ package inbound
 import (
 	"bytes"
 	"context"
+	"net"
+	"net/netip"
 	"sync"
 
 	"github.com/sagernet/quic-go"
@@ -15,6 +17,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/transport/hysteria"
+	"github.com/sagernet/sing-box/transport/tcpraw"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
@@ -25,12 +28,14 @@ var _ adapter.Inbound = (*Hysteria)(nil)
 
 type Hysteria struct {
 	myInboundAdapter
+	tcpRaw       bool
 	quicConfig   *quic.Config
 	tlsConfig    tls.ServerConfig
 	authKey      []byte
 	xplusKey     []byte
 	sendBPS      uint64
 	recvBPS      uint64
+	rawConn      net.PacketConn
 	listener     quic.Listener
 	udpAccess    sync.RWMutex
 	udpSessionId uint32
@@ -110,6 +115,13 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 		recvBPS:     down,
 		udpSessions: make(map[uint32]chan *hysteria.UDPMessage),
 	}
+	switch options.Mode {
+	case "", "udp":
+	case "faketcp":
+		inbound.tcpRaw = true
+	default:
+		return nil, E.New("unsupported mode: ", options.Mode)
+	}
 	if options.TLS == nil || !options.TLS.Enabled {
 		return nil, C.ErrTLSRequired
 	}
@@ -125,7 +137,16 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 }
 
 func (h *Hysteria) Start() error {
-	packetConn, err := h.myInboundAdapter.ListenUDP()
+	var (
+		packetConn net.PacketConn
+		err        error
+	)
+	if h.tcpRaw {
+		bindAddr := M.SocksaddrFrom(netip.Addr(h.listenOptions.Listen), h.listenOptions.ListenPort)
+		packetConn, err = tcpraw.Listen("tcp", bindAddr.String())
+	} else {
+		packetConn, err = h.myInboundAdapter.ListenUDP()
+	}
 	if err != nil {
 		return err
 	}
@@ -135,17 +156,21 @@ func (h *Hysteria) Start() error {
 	}
 	err = h.tlsConfig.Start()
 	if err != nil {
+		packetConn.Close()
 		return err
 	}
 	rawConfig, err := h.tlsConfig.Config()
 	if err != nil {
+		packetConn.Close()
 		return err
 	}
 	listener, err := quic.Listen(packetConn, rawConfig, h.quicConfig)
 	if err != nil {
+		packetConn.Close()
 		return err
 	}
 	h.listener = listener
+	h.rawConn = packetConn
 	h.logger.Info("udp server started at ", listener.Addr())
 	go h.acceptLoop()
 	return nil
@@ -311,6 +336,7 @@ func (h *Hysteria) Close() error {
 	return common.Close(
 		&h.myInboundAdapter,
 		h.listener,
+		h.rawConn,
 		h.tlsConfig,
 	)
 }

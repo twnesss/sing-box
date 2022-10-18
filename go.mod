@@ -7,6 +7,7 @@ require (
 	github.com/Dreamacro/clash v1.11.8
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/cloudflare/circl v1.2.1-0.20220831060716-4cf0150356fc
+	github.com/coreos/go-iptables v0.6.0
 	github.com/cretz/bine v0.2.0
 	github.com/database64128/tfo-go/v2 v2.0.2
 	github.com/dustin/go-humanize v1.0.0
@@ -15,6 +16,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/go-chi/render v1.0.2
 	github.com/gofrs/uuid v4.3.0+incompatible
+	github.com/google/gopacket v1.1.19
 	github.com/hashicorp/yamux v0.1.1
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mholt/acmez v1.0.4

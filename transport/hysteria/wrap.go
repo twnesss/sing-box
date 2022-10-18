@@ -10,24 +10,47 @@ import (
 	"github.com/sagernet/sing/common"
 )
 
+type AbstractPacketConn interface {
+	SetReadBuffer(int) error
+	SetWriteBuffer(int) error
+	File() (*os.File, error)
+}
+
 type PacketConnWrapper struct {
 	net.PacketConn
 }
 
 func (c *PacketConnWrapper) SetReadBuffer(bytes int) error {
-	return common.MustCast[*net.UDPConn](c.PacketConn).SetReadBuffer(bytes)
+	conn, ok := common.Cast[AbstractPacketConn](c.PacketConn)
+	if !ok {
+		return os.ErrInvalid
+	}
+	return conn.SetReadBuffer(bytes)
 }
 
 func (c *PacketConnWrapper) SetWriteBuffer(bytes int) error {
-	return common.MustCast[*net.UDPConn](c.PacketConn).SetWriteBuffer(bytes)
+	conn, ok := common.Cast[AbstractPacketConn](c.PacketConn)
+	if !ok {
+		return os.ErrInvalid
+	}
+	return conn.SetWriteBuffer(bytes)
 }
 
 func (c *PacketConnWrapper) SyscallConn() (syscall.RawConn, error) {
-	return common.MustCast[*net.UDPConn](c.PacketConn).SyscallConn()
+	conn, ok := common.Cast[syscall.Conn](c.PacketConn)
+	if !ok {
+		// fix quic-go
+		return &FakeSyscallConn{}, nil
+	}
+	return conn.SyscallConn()
 }
 
 func (c *PacketConnWrapper) File() (f *os.File, err error) {
-	return common.MustCast[*net.UDPConn](c.PacketConn).File()
+	r, ok := common.Cast[AbstractPacketConn](c.PacketConn)
+	if !ok {
+		return nil, os.ErrInvalid
+	}
+	return r.File()
 }
 
 func (c *PacketConnWrapper) Upstream() any {

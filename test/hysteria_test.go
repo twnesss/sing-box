@@ -9,6 +9,14 @@ import (
 )
 
 func TestHysteriaSelf(t *testing.T) {
+	testHysteriaSelf(t, "udp")
+}
+
+func TestHysteriaTCPRawSelf(t *testing.T) {
+	testHysteriaSelf(t, "faketcp")
+}
+
+func testHysteriaSelf(t *testing.T, mode string) {
 	_, certPem, keyPem := createSelfSignedCertificate(t, "example.org")
 	startInstance(t, option.Options{
 		Inbounds: []option.Inbound{
@@ -29,6 +37,7 @@ func TestHysteriaSelf(t *testing.T) {
 						Listen:     option.ListenAddress(netip.IPv4Unspecified()),
 						ListenPort: serverPort,
 					},
+					Mode:       mode,
 					UpMbps:     100,
 					DownMbps:   100,
 					AuthString: "password",
@@ -54,6 +63,7 @@ func TestHysteriaSelf(t *testing.T) {
 						Server:     "127.0.0.1",
 						ServerPort: serverPort,
 					},
+					Mode:       mode,
 					UpMbps:     100,
 					DownMbps:   100,
 					AuthString: "password",
