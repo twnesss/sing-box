@@ -31,7 +31,6 @@ var _ N.Dialer = (*Client)(nil)
 
 type Client struct {
 	ctx             context.Context
-	password        []byte
 	msgbus          *bus.Bus
 	udpdialer       vlite_transport.UnderlayTransportDialer
 	puni            *puniClient.PacketUniClient
@@ -40,15 +39,14 @@ type Client struct {
 	TunnelTxToTun   chan interfaces.UDPPacket
 	TunnelRxFromTun chan interfaces.UDPPacket
 	connAdp         *udpconn2tun.UDPConn2Tun
-	config          option.VLiteOutboundOptions
 	access          sync.Mutex
+	options         option.VLiteOutboundOptions
 }
 
 func NewClient(ctx context.Context, dialer N.Dialer, options option.VLiteOutboundOptions) *Client { //nolint:unparam
 	client := &Client{
-		password: []byte(options.Password),
-		config:   options,
-		msgbus:   ibus.NewMessageBus(),
+		options: options,
+		msgbus:  ibus.NewMessageBus(),
 	}
 	ctx = context.WithValue(ctx, interfaces.ExtraOptionsDisableAutoQuitForClient, true) //nolint:revive,staticcheck
 	ctx = context.WithValue(ctx, interfaces.ExtraOptionsUDPMask, options.Password)      //nolint:revive,staticcheck
@@ -124,12 +122,12 @@ func (c *Client) Start() error {
 	c.TunnelTxToTun = TunnelTxToTun
 	c.TunnelRxFromTun = TunnelRxFromTun
 
-	if c.config.EnableStabilization && c.config.EnableRenegotiation {
-		c.puni = puniClient.NewPacketUniClient(C_C2STraffic2, C_C2SDataTraffic2, C_S2CTraffic2, c.password, connctx)
+	if c.options.EnableStabilization && c.options.EnableRenegotiation {
+		c.puni = puniClient.NewPacketUniClient(C_C2STraffic2, C_C2SDataTraffic2, C_S2CTraffic2, []byte(c.options.Password), connctx)
 		c.puni.OnAutoCarrier(conn, connctx)
 		c.udpserver = worker_client.UDPClient(connctx, C_C2STraffic, C_C2SDataTraffic, C_S2CTraffic, TunnelTxToTun, TunnelRxFromTun, c.puni)
 	} else {
-		c.udprelay = sctp_server.NewPacketRelayClient(conn, C_C2STraffic2, C_C2SDataTraffic2, C_S2CTraffic2, c.password, connctx)
+		c.udprelay = sctp_server.NewPacketRelayClient(conn, C_C2STraffic2, C_C2SDataTraffic2, C_S2CTraffic2, []byte(c.options.Password), connctx)
 		c.udpserver = worker_client.UDPClient(connctx, C_C2STraffic, C_C2SDataTraffic, C_S2CTraffic, TunnelTxToTun, TunnelRxFromTun, c.udprelay)
 	}
 	c.ctx = connctx
