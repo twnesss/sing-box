@@ -18,6 +18,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mholt/acmez v1.0.4
 	github.com/miekg/dns v1.1.50
+	github.com/open-ch/ja3 v1.0.1
 	github.com/oschwald/maxminddb-golang v1.10.0
 	github.com/pires/go-proxyproto v0.6.2
 	github.com/refraction-networking/utls v1.2.0

@@ -545,6 +545,7 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 		if sniffMetadata != nil {
 			metadata.Protocol = sniffMetadata.Protocol
 			metadata.Domain = sniffMetadata.Domain
+			metadata.JA3Fingerprint = sniffMetadata.JA3Fingerprint
 			if metadata.InboundOptions.SniffOverrideDestination && M.IsDomainName(metadata.Domain) {
 				metadata.Destination = M.Socksaddr{
 					Fqdn: metadata.Domain,
@@ -555,6 +556,9 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol, ", domain: ", metadata.Domain)
 			} else {
 				r.logger.DebugContext(ctx, "sniffed protocol: ", metadata.Protocol)
+			}
+			if metadata.JA3Fingerprint != "" {
+				r.logger.DebugContext(ctx, "sniffed ja3 fingerprint: ", metadata.JA3Fingerprint)
 			}
 		}
 		if !buffer.IsEmpty() {
@@ -627,6 +631,7 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 		if sniffMetadata != nil {
 			metadata.Protocol = sniffMetadata.Protocol
 			metadata.Domain = sniffMetadata.Domain
+			metadata.JA3Fingerprint = sniffMetadata.JA3Fingerprint
 			if metadata.InboundOptions.SniffOverrideDestination && M.IsDomainName(metadata.Domain) {
 				metadata.Destination = M.Socksaddr{
 					Fqdn: metadata.Domain,
@@ -637,6 +642,9 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 				r.logger.DebugContext(ctx, "sniffed packet protocol: ", metadata.Protocol, ", domain: ", metadata.Domain)
 			} else {
 				r.logger.DebugContext(ctx, "sniffed packet protocol: ", metadata.Protocol)
+			}
+			if metadata.JA3Fingerprint != "" {
+				r.logger.DebugContext(ctx, "sniffed ja3 fingerprint: ", metadata.JA3Fingerprint)
 			}
 		}
 		conn = bufio.NewCachedPacketConn(conn, buffer, destination)
