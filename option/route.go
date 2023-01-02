@@ -101,6 +101,7 @@ type DefaultRule struct {
 	PackageName     Listable[string] `json:"package_name,omitempty"`
 	User            Listable[string] `json:"user,omitempty"`
 	UserID          Listable[int32]  `json:"user_id,omitempty"`
+	JA3Fingerprint  Listable[string] `json:"ja3_fingerprint,omitempty"`
 	ClashMode       string           `json:"clash_mode,omitempty"`
 	Invert          bool             `json:"invert,omitempty"`
 	Outbound        string           `json:"outbound,omitempty"`

@@ -178,6 +178,11 @@ func NewDefaultDNSRule(router adapter.Router, logger log.ContextLogger, options 
 		rule.items = append(rule.items, item)
 		rule.allItems = append(rule.allItems, item)
 	}
+	if len(options.JA3Fingerprint) > 0 {
+		item := NewJA3FingerprintItem(options.JA3Fingerprint)
+		rule.items = append(rule.items, item)
+		rule.allItems = append(rule.allItems, item)
+	}
 	if len(options.Outbound) > 0 {
 		item := NewOutboundRule(options.Outbound)
 		rule.items = append(rule.items, item)
