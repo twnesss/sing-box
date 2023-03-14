@@ -63,6 +63,9 @@ func startACME(ctx context.Context, options option.InboundACMEOptions) (*tls.Con
 			zap.InfoLevel,
 		)),
 	}
+	if config.DefaultServerName == "" {
+		config.DefaultServerName = options.Domain[0]
+	}
 	acmeConfig := certmagic.ACMEIssuer{
 		CA:                      acmeServer,
 		Email:                   options.Email,

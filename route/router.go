@@ -400,8 +400,26 @@ func (r *Router) Initialize(inbounds []adapter.Inbound, outbounds []adapter.Outb
 	return nil
 }
 
+func (r *Router) Inbound(tag string) (adapter.Inbound, bool) {
+	inbound, loaded := r.inboundByTag[tag]
+	return inbound, loaded
+}
+
 func (r *Router) Outbounds() []adapter.Outbound {
 	return r.outbounds
+}
+
+func (r *Router) Outbound(tag string) (adapter.Outbound, bool) {
+	outbound, loaded := r.outboundByTag[tag]
+	return outbound, loaded
+}
+
+func (r *Router) DefaultOutbound(network string) adapter.Outbound {
+	if network == N.NetworkTCP {
+		return r.defaultOutboundForConnection
+	} else {
+		return r.defaultOutboundForPacketConnection
+	}
 }
 
 func (r *Router) Start() error {
@@ -529,19 +547,6 @@ func (r *Router) LoadGeosite(code string) (adapter.Rule, error) {
 	}
 	r.geositeCache[code] = rule
 	return rule, nil
-}
-
-func (r *Router) Outbound(tag string) (adapter.Outbound, bool) {
-	outbound, loaded := r.outboundByTag[tag]
-	return outbound, loaded
-}
-
-func (r *Router) DefaultOutbound(network string) adapter.Outbound {
-	if network == N.NetworkTCP {
-		return r.defaultOutboundForConnection
-	} else {
-		return r.defaultOutboundForPacketConnection
-	}
 }
 
 func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
