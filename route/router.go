@@ -68,7 +68,7 @@ type Router struct {
 	inboundByTag                       map[string]adapter.Inbound
 	outbounds                          []adapter.Outbound
 	outboundByTag                      map[string]adapter.Outbound
-	rules                              []adapter.Rule
+	rules                              []adapter.RouteRule
 	ipRules                            []adapter.IPRule
 	defaultDetour                      string
 	defaultOutboundForConnection       adapter.Outbound
@@ -100,6 +100,7 @@ type Router struct {
 	timeService                        adapter.TimeService
 	clashServer                        adapter.ClashServer
 	v2rayServer                        adapter.V2RayServer
+	mitmService                        adapter.MITMService
 	platformInterface                  platform.Interface
 }
 
@@ -127,7 +128,7 @@ func NewRouter(
 		logger:                logFactory.NewLogger("router"),
 		dnsLogger:             logFactory.NewLogger("dns"),
 		outboundByTag:         make(map[string]adapter.Outbound),
-		rules:                 make([]adapter.Rule, 0, len(options.Rules)),
+		rules:                 make([]adapter.RouteRule, 0, len(options.Rules)),
 		ipRules:               make([]adapter.IPRule, 0, len(options.IPRules)),
 		dnsRules:              make([]adapter.DNSRule, 0, len(dnsOptions.Rules)),
 		needGeoIPDatabase:     hasRule(options.Rules, isGeoIPRule) || hasDNSRule(dnsOptions.Rules, isGeoIPDNSRule),
@@ -683,6 +684,17 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 			conn = statsService.RoutedConnection(metadata.Inbound, detour.Tag(), metadata.User, conn)
 		}
 	}
+	if matchedRule != nil && matchedRule.MITM() {
+		if r.mitmService == nil {
+			return E.New("MITM disabled")
+		}
+		fallbackConn, err := r.mitmService.ProcessConnection(ctx, conn, detour, metadata)
+		if fallbackConn != nil {
+			conn = fallbackConn
+		} else {
+			return err
+		}
+	}
 	return detour.NewConnection(ctx, conn, metadata)
 }
 
@@ -789,7 +801,7 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 	return detour.NewPacketConnection(ctx, conn, metadata)
 }
 
-func (r *Router) match(ctx context.Context, metadata *adapter.InboundContext, defaultOutbound adapter.Outbound) (adapter.Rule, adapter.Outbound) {
+func (r *Router) match(ctx context.Context, metadata *adapter.InboundContext, defaultOutbound adapter.Outbound) (adapter.RouteRule, adapter.Outbound) {
 	if r.processSearcher != nil {
 		var originDestination netip.AddrPort
 		if metadata.OriginDestination.IsValid() {
@@ -865,7 +877,7 @@ func (r *Router) DefaultMark() int {
 	return r.defaultMark
 }
 
-func (r *Router) Rules() []adapter.Rule {
+func (r *Router) Rules() []adapter.RouteRule {
 	return r.rules
 }
 
@@ -890,6 +902,14 @@ func (r *Router) TimeFunc() func() time.Time {
 		return nil
 	}
 	return r.timeService.TimeFunc()
+}
+
+func (r *Router) MITMService() adapter.MITMService {
+	return r.mitmService
+}
+
+func (r *Router) SetMITMService(service adapter.MITMService) {
+	r.mitmService = service
 }
 
 func (r *Router) ClashServer() adapter.ClashServer {

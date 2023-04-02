@@ -1,6 +1,7 @@
 package tls
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-func GenerateKeyPair(timeFunc func() time.Time, serverName string) (*tls.Certificate, error) {
+func GenerateKeyPair(timeFunc func() time.Time, serverName string, parent *tls.Certificate) (*tls.Certificate, error) {
 	if timeFunc == nil {
 		timeFunc = time.Now
 	}
@@ -35,7 +36,24 @@ func GenerateKeyPair(timeFunc func() time.Time, serverName string) (*tls.Certifi
 		},
 		DNSNames: []string{serverName},
 	}
-	publicDer, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
+	var (
+		parentCertificate *x509.Certificate
+		parentKey         crypto.PrivateKey
+	)
+	if parent != nil {
+		if parent.Leaf == nil {
+			parent.Leaf, err = x509.ParseCertificate(parent.Certificate[0])
+			if err != nil {
+				return nil, err
+			}
+		}
+		parentCertificate = parent.Leaf
+		parentKey = parent.PrivateKey
+	} else {
+		parentCertificate = template
+		parentKey = key
+	}
+	publicDer, err := x509.CreateCertificate(rand.Reader, template, parentCertificate, key.Public(), parentKey)
 	if err != nil {
 		return nil, err
 	}

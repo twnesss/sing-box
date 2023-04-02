@@ -34,3 +34,24 @@ func ParseTLSVersion(version string) (uint16, error) {
 		return 0, E.New("unknown tls version:", version)
 	}
 }
+
+func ConfigFromClientHello(clientHello *tls.ClientHelloInfo) *tls.Config {
+	minVersion := clientHello.SupportedVersions[0]
+	maxVersion := minVersion
+	for _, version := range clientHello.SupportedVersions {
+		if version > maxVersion {
+			maxVersion = version
+		}
+		if version < minVersion {
+			minVersion = version
+		}
+	}
+	return &tls.Config{
+		CipherSuites:     clientHello.CipherSuites,
+		NextProtos:       clientHello.SupportedProtos,
+		ServerName:       clientHello.ServerName,
+		MinVersion:       minVersion,
+		MaxVersion:       maxVersion,
+		CurvePreferences: clientHello.SupportedCurves,
+	}
+}

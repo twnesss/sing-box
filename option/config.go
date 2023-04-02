@@ -16,6 +16,7 @@ type _Options struct {
 	Inbounds     []Inbound            `json:"inbounds,omitempty"`
 	Outbounds    []Outbound           `json:"outbounds,omitempty"`
 	Route        *RouteOptions        `json:"route,omitempty"`
+	MITM         *MITMServiceOptions  `json:"mitm,omitempty"`
 	Experimental *ExperimentalOptions `json:"experimental,omitempty"`
 }
 

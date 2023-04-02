@@ -80,6 +80,7 @@ type DefaultRule struct {
 	ClashMode       string           `json:"clash_mode,omitempty"`
 	Invert          bool             `json:"invert,omitempty"`
 	Outbound        string           `json:"outbound,omitempty"`
+	MITM            bool             `json:"mitm,omitempty"`
 }
 
 func (r DefaultRule) IsValid() bool {
@@ -94,6 +95,7 @@ type LogicalRule struct {
 	Rules    []DefaultRule `json:"rules,omitempty"`
 	Invert   bool          `json:"invert,omitempty"`
 	Outbound string        `json:"outbound,omitempty"`
+	MITM     bool          `json:"mitm,omitempty"`
 }
 
 func (r LogicalRule) IsValid() bool {

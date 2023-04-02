@@ -8,7 +8,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 )
 
-func NewRule(router adapter.Router, logger log.ContextLogger, options option.Rule) (adapter.Rule, error) {
+func NewRule(router adapter.Router, logger log.ContextLogger, options option.Rule) (adapter.RouteRule, error) {
 	switch options.Type {
 	case "", C.RuleTypeDefault:
 		if !options.DefaultOptions.IsValid() {
@@ -31,10 +31,11 @@ func NewRule(router adapter.Router, logger log.ContextLogger, options option.Rul
 	}
 }
 
-var _ adapter.Rule = (*DefaultRule)(nil)
+var _ adapter.RouteRule = (*DefaultRule)(nil)
 
 type DefaultRule struct {
 	abstractDefaultRule
+	mitm bool
 }
 
 type RuleItem interface {
@@ -48,6 +49,7 @@ func NewDefaultRule(router adapter.Router, logger log.ContextLogger, options opt
 			invert:   options.Invert,
 			outbound: options.Outbound,
 		},
+		options.MITM,
 	}
 	if len(options.Inbound) > 0 {
 		item := NewInboundRule(options.Inbound)
@@ -187,10 +189,15 @@ func NewDefaultRule(router adapter.Router, logger log.ContextLogger, options opt
 	return rule, nil
 }
 
+func (r *DefaultRule) MITM() bool {
+	return r.mitm
+}
+
 var _ adapter.Rule = (*LogicalRule)(nil)
 
 type LogicalRule struct {
 	abstractLogicalRule
+	mitm bool
 }
 
 func NewLogicalRule(router adapter.Router, logger log.ContextLogger, options option.LogicalRule) (*LogicalRule, error) {
@@ -200,6 +207,7 @@ func NewLogicalRule(router adapter.Router, logger log.ContextLogger, options opt
 			invert:   options.Invert,
 			outbound: options.Outbound,
 		},
+		options.MITM,
 	}
 	switch options.Mode {
 	case C.LogicalTypeAnd:
@@ -217,4 +225,8 @@ func NewLogicalRule(router adapter.Router, logger log.ContextLogger, options opt
 		r.rules[i] = rule
 	}
 	return r, nil
+}
+
+func (r *LogicalRule) MITM() bool {
+	return r.mitm
 }

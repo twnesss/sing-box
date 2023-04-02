@@ -45,10 +45,13 @@ type Router interface {
 	InterfaceMonitor() tun.DefaultInterfaceMonitor
 	PackageManager() tun.PackageManager
 
-	Rules() []Rule
+	Rules() []RouteRule
 	IPRules() []IPRule
 
 	TimeService
+
+	MITMService() MITMService
+	SetMITMService(service MITMService)
 
 	ClashServer() ClashServer
 	SetClashServer(server ClashServer)
@@ -78,6 +81,11 @@ type Rule interface {
 	Match(metadata *InboundContext) bool
 	Outbound() string
 	String() string
+}
+
+type RouteRule interface {
+	Rule
+	MITM() bool
 }
 
 type DNSRule interface {

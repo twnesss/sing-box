@@ -14,6 +14,7 @@ import (
 	"github.com/sagernet/sing-box/experimental/libbox/platform"
 	"github.com/sagernet/sing-box/inbound"
 	"github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing-box/mitm"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/outbound"
 	"github.com/sagernet/sing-box/route"
@@ -184,6 +185,14 @@ func New(ctx context.Context, options option.Options, platformInterface platform
 		router.SetV2RayServer(v2rayServer)
 		preServices["v2ray api"] = v2rayServer
 	}
+	if options.MITM != nil && options.MITM.Enabled {
+		mitmService, err := mitm.NewService(router, logFactory.NewLogger("mitm"), common.PtrValueOrDefault(options.MITM))
+		if err != nil {
+			return nil, E.Cause(err, "create mitm service")
+		}
+		postServices["mitm"] = mitmService
+		router.SetMITMService(mitmService)
+	}
 	return &Box{
 		router:       router,
 		inbounds:     inbounds,
@@ -271,6 +280,12 @@ func (s *Box) start() error {
 			return E.Cause(err, "start ", serviceName)
 		}
 	}
+	for serviceName, service := range s.postServices {
+		err = service.Start()
+		if err != nil {
+			return E.Cause(err, "start ", serviceName)
+		}
+	}
 	for i, in := range s.inbounds {
 		err = in.Start()
 		if err != nil {
@@ -281,12 +296,6 @@ func (s *Box) start() error {
 				tag = in.Tag()
 			}
 			return E.Cause(err, "initialize inbound/", in.Type(), "[", tag, "]")
-		}
-	}
-	for serviceName, service := range s.postServices {
-		err = service.Start()
-		if err != nil {
-			return E.Cause(err, "start ", serviceName)
 		}
 	}
 	return nil
@@ -300,14 +309,14 @@ func (s *Box) Close() error {
 		close(s.done)
 	}
 	var errors error
-	for serviceName, service := range s.postServices {
-		errors = E.Append(errors, service.Close(), func(err error) error {
-			return E.Cause(err, "close ", serviceName)
-		})
-	}
 	for i, in := range s.inbounds {
 		errors = E.Append(errors, in.Close(), func(err error) error {
 			return E.Cause(err, "close inbound/", in.Type(), "[", i, "]")
+		})
+	}
+	for serviceName, service := range s.postServices {
+		errors = E.Append(errors, service.Close(), func(err error) error {
+			return E.Cause(err, "close ", serviceName)
 		})
 	}
 	for i, out := range s.outbounds {
