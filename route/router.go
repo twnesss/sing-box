@@ -784,7 +784,7 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 		}
 	}
 	if originAddress.IsValid() {
-		conn = fakeip.NewNATPacketConn(conn, originAddress, metadata.Destination)
+		conn = bufio.NewNATPacketConn(&bufio.FallbackPacketConn{PacketConn: conn}, originAddress, metadata.Destination)
 	}
 	return detour.NewPacketConnection(ctx, conn, metadata)
 }
