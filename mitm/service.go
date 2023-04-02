@@ -32,6 +32,7 @@ type Service struct {
 	keyPath         string
 	watcher         *fsnotify.Watcher
 	insecure        bool
+	engines         []Engine
 }
 
 func NewService(router adapter.Router, logger logger.ContextLogger, options option.MITMServiceOptions) (*Service, error) {
@@ -80,6 +81,14 @@ func NewService(router adapter.Router, logger logger.ContextLogger, options opti
 		insecure:        options.Insecure,
 	}
 
+	if options.HTTP != nil && options.HTTP.Enabled {
+		engine, err := NewHTTPEngine(logger, common.PtrValueOrDefault(options.HTTP))
+		if err != nil {
+			return nil, err
+		}
+		service.engines = append(service.engines, engine)
+	}
+
 	return service, nil
 }
 
@@ -119,24 +128,29 @@ func (s *Service) ProcessConnection(ctx context.Context, conn net.Conn, dialer N
 	if err != nil {
 		return nil, N.HandshakeFailure(conn, err)
 	}
-	clientConn := tls.Server(bufio.NewCachedConn(conn, buffer), &tls.Config{
-		GetConfigForClient: func(info *tls.ClientHelloInfo) (*tls.Config, error) {
-			var serverConfig tls.Config
-			serverConfig.Time = s.router.TimeFunc()
-			if serverConn.ConnectionState().NegotiatedProtocol != "" {
-				serverConfig.NextProtos = []string{serverConn.ConnectionState().NegotiatedProtocol}
-			}
-			serverConfig.ServerName = clientHello.ServerName
-			serverConfig.MinVersion = tls.VersionTLS10
-			serverConfig.GetCertificate = func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				return sTLS.GenerateKeyPair(nil, serverConfig.ServerName, s.tlsCertificate)
-			}
-			return &serverConfig, nil
-		},
-	})
-	err = clientConn.HandshakeContext(ctx)
+	var serverConfig tls.Config
+	serverConfig.Time = s.router.TimeFunc()
+	if serverConn.ConnectionState().NegotiatedProtocol != "" {
+		serverConfig.NextProtos = []string{serverConn.ConnectionState().NegotiatedProtocol}
+	}
+	serverConfig.ServerName = clientHello.ServerName
+	serverConfig.MinVersion = tls.VersionTLS10
+	serverConfig.GetCertificate = func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		return sTLS.GenerateKeyPair(nil, serverConfig.ServerName, s.tlsCertificate)
+	}
+
+	clientTLSConn := tls.Server(bufio.NewCachedConn(conn, buffer), &serverConfig)
+	err = clientTLSConn.HandshakeContext(ctx)
 	if err != nil {
 		return nil, E.Cause(err, "mitm TLS handshake")
+	}
+
+	var clientConn net.Conn = clientTLSConn
+	for _, engine := range s.engines {
+		clientConn, err = engine.ProcessConnection(ctx, clientTLSConn, serverConn, metadata)
+		if conn == nil {
+			return nil, err
+		}
 	}
 	s.logger.DebugContext(ctx, "mitm TLS handshake success")
 	return nil, bufio.CopyConn(ctx, clientConn, serverConn)
