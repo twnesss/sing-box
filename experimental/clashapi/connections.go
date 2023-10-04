@@ -9,10 +9,11 @@ import (
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/json"
 	"github.com/sagernet/sing-box/experimental/clashapi/trafficontrol"
-	"github.com/sagernet/websocket"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 )
 
 func connectionRouter(router adapter.Router, trafficManager *trafficontrol.Manager) http.Handler {
@@ -25,13 +26,13 @@ func connectionRouter(router adapter.Router, trafficManager *trafficontrol.Manag
 
 func getConnections(trafficManager *trafficontrol.Manager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !websocket.IsWebSocketUpgrade(r) {
+		if r.Header.Get("Upgrade") != "websocket" {
 			snapshot := trafficManager.Snapshot()
 			render.JSON(w, r, snapshot)
 			return
 		}
 
-		conn, err := upgrader.Upgrade(w, r, nil)
+		conn, _, _, err := ws.UpgradeHTTP(r, w)
 		if err != nil {
 			return
 		}
@@ -56,7 +57,7 @@ func getConnections(trafficManager *trafficontrol.Manager) func(w http.ResponseW
 			if err := json.NewEncoder(buf).Encode(snapshot); err != nil {
 				return err
 			}
-			return conn.WriteMessage(websocket.TextMessage, buf.Bytes())
+			return wsutil.WriteServerText(conn, buf.Bytes())
 		}
 
 		if err = sendSnapshot(); err != nil {
