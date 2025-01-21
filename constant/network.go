@@ -5,6 +5,8 @@ import (
 	F "github.com/sagernet/sing/common/format"
 )
 
+var URLTestUnifiedDelay = true
+
 type InterfaceType uint8
 
 const (
