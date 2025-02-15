@@ -72,9 +72,13 @@ func (t *PredefinedTransport) Exchange(ctx context.Context, message *mDNS.Msg) (
 					return common.Contains(message.Question, question)
 				}
 			}() {
-				copyAnswer := *response.answer
+				copyAnswer := response.answer.Copy()
 				copyAnswer.Id = message.Id
-				return &copyAnswer, nil
+				copyAnswer.Question = message.Question
+				copyAnswer.Authoritative = true
+				copyAnswer.RecursionDesired = true
+				copyAnswer.RecursionAvailable = true
+				return copyAnswer, nil
 			}
 		}
 	}
