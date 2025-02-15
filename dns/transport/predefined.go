@@ -54,6 +54,15 @@ func NewPredefined(ctx context.Context, logger log.ContextLogger, tag string, op
 func (t *PredefinedTransport) Reset() {
 }
 
+func replaceRR(rrs []mDNS.RR, name, replacement string) {
+	for i, rr := range rrs {
+		if rr.Header().Name == name {
+			rr.Header().Name = replacement
+			rrs[i] = rr
+		}
+	}
+}
+
 func (t *PredefinedTransport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	for _, response := range t.responses {
 		for _, question := range response.questions {
@@ -78,6 +87,13 @@ func (t *PredefinedTransport) Exchange(ctx context.Context, message *mDNS.Msg) (
 				copyAnswer.Authoritative = true
 				copyAnswer.RecursionDesired = true
 				copyAnswer.RecursionAvailable = true
+
+				// replace query.invalid. with actual query
+				actualQuery := message.Question[0].Name
+				replaceRR(copyAnswer.Answer, "query.invalid.", actualQuery)
+				replaceRR(copyAnswer.Ns, "query.invalid.", actualQuery)
+				replaceRR(copyAnswer.Extra, "query.invalid.", actualQuery)
+
 				return copyAnswer, nil
 			}
 		}
